@@ -70,7 +70,12 @@ async fn patch_item(
 ) -> Result<(), Error> {
     let old_item = get_item(client, key).await?;
     match old_item {
-        Some(mut old_item) => Ok(json_patch::merge(&mut old_item, item)),
+        Some(mut old_item) => {
+            json_patch::merge(&mut old_item, item);
+            let new_item = serde_json::to_string(&old_item).unwrap();
+            put_item(&client, key, &new_item).await?;
+            Ok(())
+        }
         None => Err("no item".into()),
     }
 }
