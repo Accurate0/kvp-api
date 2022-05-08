@@ -60,6 +60,25 @@
         ],
         "responses": []
       }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "general-apim/KVP-API-v1/Patch",
+      "dependsOn": [],
+      "properties": {
+        "displayName": "Patch Value",
+        "method": "PATCH",
+        "urlTemplate": "/{key}",
+        "templateParameters": [
+          {
+            "name": "key",
+            "type": "string",
+            "required": true
+          }
+        ],
+        "responses": []
+      }
     }
   ]
 }
