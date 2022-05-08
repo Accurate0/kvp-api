@@ -63,6 +63,18 @@ async fn delete_item(client: &Client, key: &str) -> Result<(), Error> {
     Ok(())
 }
 
+async fn patch_item(
+    client: &Client,
+    key: &str,
+    item: &serde_json::value::Value,
+) -> Result<(), Error> {
+    let old_item = get_item(client, key).await?;
+    match old_item {
+        Some(mut old_item) => Ok(json_patch::merge(&mut old_item, item)),
+        None => Err("no item".into()),
+    }
+}
+
 async fn run(request: Request) -> Result<impl IntoResponse, Error> {
     let shared_config = aws_config::load_from_env().await;
     let client = Client::new(&shared_config);
@@ -101,6 +113,21 @@ async fn run(request: Request) -> Result<impl IntoResponse, Error> {
                     Method::DELETE => {
                         delete_item(&client, key).await?;
                         Response::builder().status(204).body("".into()).unwrap()
+                    }
+                    Method::PATCH => {
+                        let payload = match request.body() {
+                            lambda_http::Body::Text(s) => s,
+                            _ => {
+                                return Ok(Response::builder().status(400).body("".into()).unwrap())
+                            }
+                        };
+                        match serde_json::to_value(payload) {
+                            Ok(v) => match patch_item(&client, key, &v).await {
+                                Ok(_) => Response::builder().status(204).body("".into()).unwrap(),
+                                Err(_) => Response::builder().status(400).body("".into()).unwrap(),
+                            },
+                            Err(_) => Response::builder().status(400).body("".into()).unwrap(),
+                        }
                     }
                     _ => Response::builder().status(400).body("".into()).unwrap(),
                 },
