@@ -18,11 +18,7 @@ const KEY: &str = "key";
 const VALUE: &str = "value";
 const TIME: &str = "time";
 
-async fn put_item(
-    client: &Client,
-    key: &str,
-    item: &serde_json::value::Value,
-) -> Result<(), Error> {
+async fn put_item(client: &Client, key: &str, item: &serde_json::Value) -> Result<(), Error> {
     let now = SystemTime::now();
     let now: DateTime<Utc> = now.into();
     let now = now.to_rfc3339();
@@ -42,7 +38,7 @@ async fn put_item(
     Ok(())
 }
 
-async fn get_item(client: &Client, key: &str) -> Result<Option<serde_json::value::Value>, Error> {
+async fn get_item(client: &Client, key: &str) -> Result<Option<serde_json::Value>, Error> {
     let resp = client
         .get_item()
         .table_name(TABLE_NAME)
@@ -52,7 +48,7 @@ async fn get_item(client: &Client, key: &str) -> Result<Option<serde_json::value
 
     Ok(match resp.item {
         Some(ref item) => match item[VALUE].as_s() {
-            Ok(s) => Some(serde_json::from_str::<serde_json::value::Value>(s).unwrap()),
+            Ok(s) => Some(serde_json::from_str::<serde_json::Value>(s).unwrap()),
             _ => panic!(),
         },
         None => None,
@@ -70,15 +66,14 @@ async fn delete_item(client: &Client, key: &str) -> Result<(), Error> {
     Ok(())
 }
 
-async fn patch_item(
-    client: &Client,
-    key: &str,
-    item: &serde_json::value::Value,
-) -> Result<(), Error> {
+async fn patch_item(client: &Client, key: &str, item: &serde_json::Value) -> Result<(), Error> {
     let old_item = get_item(client, key).await?;
     match old_item {
         Some(mut old_item) => {
+            dbg!(&item);
+            dbg!(&old_item);
             json_patch::merge(&mut old_item, item);
+            dbg!(&old_item);
             put_item(&client, key, &old_item).await?;
             Ok(())
         }
@@ -112,9 +107,9 @@ async fn run(request: Request) -> Result<impl IntoResponse, Error> {
                     },
                     Method::POST => match request.body() {
                         lambda_http::Body::Text(s) => {
-                            match serde_json::from_str::<serde_json::value::Value>(s) {
-                                Ok(s) => {
-                                    put_item(&client, key, &s).await?;
+                            match serde_json::from_str::<serde_json::Value>(s) {
+                                Ok(obj) => {
+                                    put_item(&client, key, &obj).await?;
                                     Response::builder().status(204).body("".into()).unwrap()
                                 }
                                 Err(_) => Response::builder().status(400).body("".into()).unwrap(),
@@ -133,7 +128,7 @@ async fn run(request: Request) -> Result<impl IntoResponse, Error> {
                                 return Ok(Response::builder().status(400).body("".into()).unwrap())
                             }
                         };
-                        match serde_json::to_value(payload) {
+                        match serde_json::from_str::<serde_json::Value>(payload) {
                             Ok(v) => match patch_item(&client, key, &v).await {
                                 Ok(_) => Response::builder().status(204).body("".into()).unwrap(),
                                 Err(_) => Response::builder().status(400).body("".into()).unwrap(),
