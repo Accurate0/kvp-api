@@ -70,10 +70,7 @@ async fn patch_item(client: &Client, key: &str, item: &serde_json::Value) -> Res
     let old_item = get_item(client, key).await?;
     match old_item {
         Some(mut old_item) => {
-            dbg!(&item);
-            dbg!(&old_item);
             json_patch::merge(&mut old_item, item);
-            dbg!(&old_item);
             put_item(&client, key, &old_item).await?;
             Ok(())
         }
