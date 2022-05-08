@@ -18,7 +18,11 @@ const KEY: &str = "key";
 const VALUE: &str = "value";
 const TIME: &str = "time";
 
-async fn put_item(client: &Client, key: &str, item: &String) -> Result<(), Error> {
+async fn put_item(
+    client: &Client,
+    key: &str,
+    item: &serde_json::value::Value,
+) -> Result<(), Error> {
     let now = SystemTime::now();
     let now: DateTime<Utc> = now.into();
     let now = now.to_rfc3339();
@@ -27,7 +31,10 @@ async fn put_item(client: &Client, key: &str, item: &String) -> Result<(), Error
         .put_item()
         .table_name(TABLE_NAME)
         .item(KEY, AttributeValue::S(key.to_string()))
-        .item(VALUE, AttributeValue::S(item.to_string()))
+        .item(
+            VALUE,
+            AttributeValue::S(serde_json::to_string(item).unwrap()),
+        )
         .item(TIME, AttributeValue::S(now.to_string()))
         .send()
         .await?;
@@ -72,8 +79,7 @@ async fn patch_item(
     match old_item {
         Some(mut old_item) => {
             json_patch::merge(&mut old_item, item);
-            let new_item = serde_json::to_string(&old_item).unwrap();
-            put_item(&client, key, &new_item).await?;
+            put_item(&client, key, &old_item).await?;
             Ok(())
         }
         None => Err("no item".into()),
@@ -104,17 +110,18 @@ async fn run(request: Request) -> Result<impl IntoResponse, Error> {
                             .unwrap(),
                         None => Response::builder().status(404).body("".into()).unwrap(),
                     },
-                    Method::POST => {
-                        let payload = match request.body() {
-                            lambda_http::Body::Text(s) => s,
-                            _ => {
-                                return Ok(Response::builder().status(400).body("".into()).unwrap())
+                    Method::POST => match request.body() {
+                        lambda_http::Body::Text(s) => {
+                            match serde_json::from_str::<serde_json::value::Value>(s) {
+                                Ok(s) => {
+                                    put_item(&client, key, &s).await?;
+                                    Response::builder().status(204).body("".into()).unwrap()
+                                }
+                                Err(_) => Response::builder().status(400).body("".into()).unwrap(),
                             }
-                        };
-
-                        put_item(&client, key, payload).await?;
-                        Response::builder().status(204).body("".into()).unwrap()
-                    }
+                        }
+                        _ => return Ok(Response::builder().status(400).body("".into()).unwrap()),
+                    },
                     Method::DELETE => {
                         delete_item(&client, key).await?;
                         Response::builder().status(204).body("".into()).unwrap()
