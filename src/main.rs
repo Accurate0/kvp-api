@@ -74,7 +74,7 @@ async fn patch_item(client: &Client, key: &str, item: &serde_json::Value) -> Res
             put_item(&client, key, &old_item).await?;
             Ok(())
         }
-        None => Err("no item".into()),
+        None => Ok(put_item(client, key, item).await?),
     }
 }
 
