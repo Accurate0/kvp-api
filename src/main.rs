@@ -130,7 +130,7 @@ async fn run(request: Request) -> Result<impl IntoResponse, Error> {
                                 Ok(_) => Response::builder().status(204).body("".into()).unwrap(),
                                 Err(_) => Response::builder().status(400).body("".into()).unwrap(),
                             },
-                            Err(_) => Response::builder().status(400).body("".into()).unwrap(),
+                            Err(_) => Response::builder().status(415).body("".into()).unwrap(),
                         }
                     }
                     _ => Response::builder().status(400).body("".into()).unwrap(),
